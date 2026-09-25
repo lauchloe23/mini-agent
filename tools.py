@@ -55,6 +55,26 @@ def run_command(command):
         return f"ERROR: Could not run command: {e}"
 
 
+def git_diff():
+    try:
+        result = subprocess.run(
+            ["git", "diff"],
+            capture_output = True,
+            text = True,
+            timeout = 30
+        )
+        if result.returncode != 0:
+            return f"ERROR: git diff failed: {result.stderr}"
+        output = result.stdout
+        return output if output.strip() else "No uncommitted changes."
+    except FileNotFoundError:
+        return "ERROR: git is not installed or not on PATH."
+    except subprocess.TimeoutExpired:
+        return "ERROR: git diff timed out."
+    except Exception as e:
+        return f"ERROR: Could not run git diff: {e}"
+
+
 # Test cases
 if __name__ == "__main__":
     print(write_file("test.txt","hello world"))

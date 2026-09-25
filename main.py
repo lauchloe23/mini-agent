@@ -1,6 +1,7 @@
 import json
+import groq
 from groq import Groq
-from tools import read_file, write_file, list_files, run_command
+from tools import read_file, write_file, list_files, run_command, git_diff
 
 # read GROQ_API_KEY from environment 
 client = Groq()
@@ -70,6 +71,18 @@ TOOLS = [
                 "required" : ["command"]
             }
         }
+    },
+    {
+        "type" : "function",
+        "function" : {
+            "name" : "git_diff",
+            "description" : "Show uncommitted changes in the current git respository (ie. running 'git diff').",
+            "parameters" : {
+                "type" : "object",
+                "properties" : {},
+                "required" : []
+            }
+        }
     }
 ]
 
@@ -89,6 +102,8 @@ def call_tool(name, arguments):
         if approval != "y":
             return "ERROR: User denied permission to run this command."
         return run_command(command)
+    elif name == "git_diff" :
+        return git_diff()
     else:
         return f"ERROR: Unknown tool '{name}'"
 
@@ -96,11 +111,21 @@ def run_agent(user_message, conversation_history):
     conversation_history.append({"role" : "user", "content" : user_message})
 
     while True:
-        response = client.chat.completions.create(
-            model = MODEL,
-            messages = conversation_history,
-            tools = TOOLS,
-        )
+        retries = 0
+        while True:
+            try:
+                response = client.chat.completions.create(
+                    model = MODEL,
+                    messages = conversation_history,
+                    tools = TOOLS,
+                )
+                break # successful response, exit retry loop
+            except groq.BadRequestError as e:
+                retries += 1
+                print(f"\n [Model sent a malform tool call, retrying ({retries}/3)...]")
+                if retries >= 3:
+                    print(f"[Giving up after 3 attempts. Try rephrasing your request.]")
+                    return conversation_history
 
         message = response.choices[0].message
         conversation_history.append(message)
@@ -109,7 +134,7 @@ def run_agent(user_message, conversation_history):
             print(f"\nAgent: {message.content}")
 
         if not message.tool_calls:
-            break
+            break  
 
         for tool_call in message.tool_calls:
             name = tool_call.function.name
