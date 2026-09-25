@@ -1,6 +1,6 @@
 import json
 from groq import Groq
-from tools import read_file, write_file, list_files
+from tools import read_file, write_file, list_files, run_command
 
 # read GROQ_API_KEY from environment 
 client = Groq()
@@ -53,6 +53,23 @@ TOOLS = [
                 "required" : []
             }
         }
+    },
+    {
+        "type" : "function",
+        "function": {
+            "name" : "run_command",
+            "description" : "Run a shell command on user's computer and return its output. Use this to run scripts, check tool versions, or run tests.",
+            "parameters" : {
+                "type" : "object",
+                "properties" : {
+                    "command" : {
+                        "type" : "string",
+                        "description" : "The exact shell command to run, e.g. 'ls -la' or 'python script.py'."
+                    }
+                },
+                "required" : ["command"]
+            }
+        }
     }
 ]
 
@@ -65,6 +82,13 @@ def call_tool(name, arguments):
         return write_file(arguments["path"], arguments["content"])
     elif name == "list_files" :
         return list_files(arguments.get("directory", "."))
+    elif name == "run_command" :
+        command = arguments["command"]
+        print(f"\n The agent wants to run this command:\n   {command}")
+        approval = input("Do you approve? (y/n): ").strip().lower()
+        if approval != "y":
+            return "ERROR: User denied permission to run this command."
+        return run_command(command)
     else:
         return f"ERROR: Unknown tool '{name}'"
 

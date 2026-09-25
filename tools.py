@@ -1,4 +1,5 @@
 import os
+import subprocess
 
 def read_file(path):
     try:
@@ -30,6 +31,29 @@ def list_files(directory="."):
             full_path = os.path.join(root, filename)
             file_list.append(full_path)
     return "\n".join(file_list) if file_list else "No files found"
+
+# subprocess
+def run_command(command):
+    try:
+        result = subprocess.run(
+            command,
+            shell = True,
+            capture_output = True,
+            text = True,
+            timeout = 30,
+        )
+        output = result.stdout
+        
+        if result.stderr: 
+            output += f"\n[stderr]: {result.stderr}"
+        if not output.strip():
+            output = f"(command finished with no output, exit code {result.returncode})"
+        return output
+    except subprocess.TimeoutExpired:
+        return "ERROR: Command timed out after 30 seconds"
+    except Exception as e:
+        return f"ERROR: Could not run command: {e}"
+
 
 # Test cases
 if __name__ == "__main__":
