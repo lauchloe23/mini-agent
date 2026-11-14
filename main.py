@@ -1,7 +1,7 @@
 import json
 import groq
 from groq import Groq
-from tools import read_file, write_file, list_files, run_command, git_diff
+from tools import read_file, write_file, list_files, run_command, git_diff, run_tests
 
 # read GROQ_API_KEY from environment 
 client = Groq()
@@ -83,9 +83,26 @@ TOOLS = [
                 "required" : []
             }
         }
+    },
+    {
+        "type" : "function",
+        "function" : {
+            "name" : "run_tests",
+            "description" : "Run the project's unit tests (python unittest discovery) and return the results. Use after changing code to check it still works.",
+            "parameters" : {
+                "type" : "object",
+                "properties" : {},
+                "required" : []
+            }
+        }
     }
 ]
 
+
+# Ask the user before running anything that executes code
+def approved(what):
+    print(f"\n The agent wants to run: {what}")
+    return input("Do you approve? (y/n): ").strip().lower() == "y"
 
 # Function
 def call_tool(name, arguments):
@@ -96,12 +113,13 @@ def call_tool(name, arguments):
     elif name == "list_files" :
         return list_files(arguments.get("directory", "."))
     elif name == "run_command" :
-        command = arguments["command"]
-        print(f"\n The agent wants to run this command:\n   {command}")
-        approval = input("Do you approve? (y/n): ").strip().lower()
-        if approval != "y":
+        if not approved(arguments["command"]):
             return "ERROR: User denied permission to run this command."
-        return run_command(command)
+        return run_command(arguments["command"])
+    elif name == "run_tests" :
+        if not approved("the project's unit tests"):
+            return "ERROR: User denied permission to run the tests."
+        return run_tests()
     elif name == "git_diff" :
         return git_diff()
     else:

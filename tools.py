@@ -1,5 +1,6 @@
 import os
 import subprocess
+import sys
 
 def read_file(path):
     try:
@@ -73,6 +74,22 @@ def git_diff():
         return "ERROR: git diff timed out."
     except Exception as e:
         return f"ERROR: Could not run git diff: {e}"
+
+
+def run_tests():
+    try:
+        result = subprocess.run(
+            [sys.executable, "-m", "unittest", "discover", "-v"],
+            capture_output = True,
+            text = True,
+            timeout = 60
+        )
+        status = "PASSED" if result.returncode == 0 else "FAILED"
+        return f"Tests {status}.\n{result.stdout}{result.stderr}"
+    except subprocess.TimeoutExpired:
+        return "ERROR: tests timed out after 60 seconds."
+    except Exception as e:
+        return f"ERROR: Could not run tests: {e}"
 
 
 # Test cases
