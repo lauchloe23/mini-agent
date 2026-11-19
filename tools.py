@@ -35,6 +35,7 @@ def write_file(path, content):
         return f"ERROR: Could not write file: {e}"
 
 def list_files(directory="."):
+    directory = directory or "."
     if not safe_path(directory):
         return f"ERROR: Access denied (outside project folder): {directory}"
     file_list = []
