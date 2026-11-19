@@ -1,5 +1,7 @@
 import json
+import re
 import groq
+from datetime import datetime
 from groq import Groq
 from tools import read_file, write_file, list_files, run_command, git_diff, run_tests
 
@@ -99,6 +101,15 @@ TOOLS = [
 ]
 
 
+# Safety rules: never run these, and skip the prompt for these harmless commands
+BLOCKED = r"\b(rm|del|rmdir|rd|format|shutdown|remove-item|mkfs)\b"
+SAFE = ("git status", "git log --oneline", "git diff")
+
+# Record every tool call in agent.log
+def log(name, arguments, result):
+    with open("agent.log", "a", encoding="utf-8") as f:
+        f.write(f"{datetime.now():%Y-%m-%d %H:%M:%S} {name} {arguments} -> {result[:100]!r}\n")
+
 # Ask the user before running anything that executes code
 def approved(what):
     print(f"\n The agent wants to run: {what}")
@@ -113,9 +124,12 @@ def call_tool(name, arguments):
     elif name == "list_files" :
         return list_files(arguments.get("directory", "."))
     elif name == "run_command" :
-        if not approved(arguments["command"]):
+        command = arguments["command"].strip()
+        if re.search(BLOCKED, command.lower()):
+            return "ERROR: Command blocked by safety rules."
+        if command not in SAFE and not approved(command):
             return "ERROR: User denied permission to run this command."
-        return run_command(arguments["command"])
+        return run_command(command)
     elif name == "run_tests" :
         if not approved("the project's unit tests"):
             return "ERROR: User denied permission to run the tests."
@@ -159,6 +173,7 @@ def run_agent(user_message, conversation_history):
             arguments = json.loads(tool_call.function.arguments)
             print(f" [Running tool: {name}({arguments})]")
             result = call_tool(name, arguments)
+            log(name, arguments, result)
 
             conversation_history.append({
                 "role" : "tool",
@@ -169,7 +184,7 @@ def run_agent(user_message, conversation_history):
 
 # Main Function
 def main():
-    print("Mini Coding Agent (V1) - type 'exit' to quit")
+    print("Mini Coding Agent (V5) - type 'exit' to quit")
     conversation_history = []
     while True:
         user_message = input("\nYou: ")
